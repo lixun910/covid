@@ -141,7 +141,7 @@ a:visited {
   position: absolute;
   top: 50px;
   left: 0px;
-  width: 344px;
+  width: 300px;
   background: #444;
   color: #fff;
   padding: 20px 24px 12px 24px;
@@ -196,7 +196,7 @@ a:visited {
 }
 
 #left-collapse {
-  left: 392px;
+  left: 348px;
   border-bottom-right-radius: 10px;
 }
 
@@ -210,7 +210,7 @@ a:visited {
 }
 
 #left-collapse.left-panel--collapsed  {
-  left: 17px !important;
+  left: 0px !important;
 
 }
 
@@ -358,9 +358,8 @@ a:visited {
   color: #fff;
   z-index: 10000;
   border-radius: 5px 5px 5px 0px;
-  left: 20%;
   text-align: center;
-  width: 200px;
+  width: 100%;
 }
 
 #slider-min, #slider-max {
@@ -472,6 +471,32 @@ data panel
   top: 0px; 
   left: 0px;
   z-index:999;
+}
+
+@media only screen and (max-width: 600px) {
+  .navbar ul{
+    display: none !important;
+  }
+  .mapboxgl-ctrl-geocoder {
+    display: none;
+  }
+  .mapboxgl-ctrl-group {
+    display: none;
+  }
+  .legend-wrap {
+    margin-left: 0;
+    width: 95%;
+    border-radius: initial;
+  }
+  #sliderdiv {
+    left: 0;
+    top: initial;
+    max-width: initial;
+    border-radius: initial;
+    bottom:40px !important;
+    width: 95% !important;
+    padding: 10px;
+  }
 }
 
 .navbar ul {
