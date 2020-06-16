@@ -415,7 +415,7 @@ data panel
   position: absolute;
   top: 50px;
   right: 0px;
-  z-index: 1;
+  z-index: 9091;
   border-radius: 0px 0px 0px 10px;
   overflow-y: auto;
   height: 85%;
