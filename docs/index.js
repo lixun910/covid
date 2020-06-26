@@ -17,7 +17,7 @@ const {
  * CONFIG
 */
 
-const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1IjoibGl4dW45MTAiLCJhIjoiY2locXMxcWFqMDAwenQ0bTFhaTZmbnRwaiJ9.VRNeNnyb96Eo-CorkJmIqg';
+const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1IjoibGl4dW45MTAiLCJhIjoiY2thNzZweW5yMDA3MDJ5bXNxcTdyczduMiJ9.pL2Ussun_y9B7eSOyArkaQ';
 
 const COLOR_SCALE = [
   [240, 240, 240],
