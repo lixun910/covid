@@ -17,7 +17,7 @@ const {
  * CONFIG
 */
 
-const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1IjoibGl4dW45MTAiLCJhIjoiY2thNzZweW5yMDA3MDJ5bXNxcTdyczduMiJ9.pL2Ussun_y9B7eSOyArkaQ';
+const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1IjoibGl4dW45MTAiLCJhIjoiY2locXMxcWFqMDAwenQ0bTFhaTZmbnRwaiJ9.VRNeNnyb96Eo-CorkJmIqg';
 
 const COLOR_SCALE = {
   'natural_breaks':[
@@ -168,6 +168,10 @@ var getFillColor = function() {
 var getLineColor = function() {
   return [220, 220, 220];
 };
+
+//
+var is_highlight = false;
+
 
 
 /*
@@ -1077,26 +1081,30 @@ function handleMapHover(e) {
   updateTooltip(e);
 }
 
-function highlightSelected(feat) {
-  if (feat) {
+function highlightSelected(ids) {
+  if (ids.length > 0) {
+    is_highlight = true;
+
+    var hlFeatures = [];
+    for (var i =0; i<ids.length; ++i) {
+      hlFeatures.push(jsondata[selectedDataset].features[ ids[i] ]);
+    }
     // highlight the selected polygon
     let lyr = {
       id: 'hllayer',
       type: GeoJsonLayer,
       data: {
-        'type': 'Feature',
+        'type': 'FeatureCollection',
         'properties': {},
-        'geometry': {
-          'type': "Polygon",
-          'coordinates': feat.geometry.coordinates
-        }
+        'features' :  hlFeatures,
       },
+      opacity: 0.6,
       getLineColor: [0, 0, 0],
-      getFillColor: [255, 0, 0],
-      lineWidthScale: 2,
-      lineWidthMinPixels: 2,
+      getFillColor: getFillColor,
+      lineWidthScale: 1,
+      lineWidthMinPixels: 1,
       stroked: true,
-      filled: false
+      filled:false 
     };
     const firstLabelLayerId = mapbox.getStyle().layers.find(layer => layer.type === 'symbol').id;
     if (!mapbox.getLayer("hllayer")) {
@@ -1106,18 +1114,18 @@ function highlightSelected(feat) {
     }
     mapbox.setLayoutProperty(lyr.id, 'visibility', 'visible');
     layer_dict[lyr.id].setProps(lyr);
+    // update the layer
+    //var p = getCountyLayer(jsondata[selectedDataset]);
+    //layer_dict["county_layer"].setProps(p);
   }
 }
 
 window.addEventListener('storage', () => {
   // When local storage changes, dump the list to
   // the console.
-  const hl_id =  window.localStorage.getItem('HL_IDS');
-  if (isFinite(hl_id)) {
-    selectedId = hl_id;
-    const feat = jsondata[selectedDataset]["features"][hl_id];
-    highlightSelected(feat);
-  }
+  const hl_ids =  window.localStorage.getItem('HL_IDS');
+  var selectedIds = eval(hl_ids);
+  highlightSelected(selectedIds);
 });
 
 function handleMapClick(e) {
@@ -1125,9 +1133,10 @@ function handleMapClick(e) {
   updateDataPanel(e);
   // update map to highlight any selected
   if (e.object) {
-    highlightSelected(e.object); 
+    var ids = [e.object.properties.id];
+    highlightSelected(ids); 
     // sync between windows
-    window.localStorage.setItem("HL_IDS", JSON.stringify(e.object.properties.id));
+    window.localStorage.setItem("HL_IDS", JSON.stringify(ids));
   }
 }
 
@@ -1425,6 +1434,140 @@ const mapbox = new mapboxgl.Map({
   zoom: 3.5
 });
 
+// Disable default box zooming.
+mapbox.boxZoom.disable();
+
+mapbox.on('load', function () {
+  var canvas = mapbox.getCanvasContainer();
+
+  // Variable to hold the starting xy coordinates
+  // when `mousedown` occured.
+  var start, start_ll;
+
+  // Variable to hold the current xy coordinates
+  // when `mousemove` or `mouseup` occurs.
+  var current, current_ll;
+
+  // Variable for the draw box element.
+  var box;
+
+  console.log("load map");
+
+  // Set `true` to dispatch the event before other functions
+  // call it. This is necessary for disabling the default map
+  // dragging behaviour.
+  //canvas.addEventListener('mousedown', mouseDown, true);
+
+  // Return the xy coordinates of the mouse position
+  function mousePos(e) {
+    var rect = canvas.getBoundingClientRect();
+    return new mapboxgl.Point(
+        e.point.x,//e.clientX - rect.left - canvas.clientLeft,
+        e.point.y//e.clientY - rect.top - canvas.clientTop
+    );
+  }
+
+  var down = false;
+  mapbox.on('mousedown', function(e) {
+    // Continue the rest of the function if the shiftkey is pressed.
+    if (e.originalEvent.shiftKey && e.originalEvent.button === 0) {
+
+    e.preventDefault();
+
+    // Disable default drag zooming when the shift key is held down.
+    mapbox.dragPan.disable();
+
+    //map.setPaintProperty("counties", 'fill-color', 'rgba(0,0,0,0.1)');
+    
+    // Call functions for the following events
+    //canvas.addEventListener('mousemove', onMouseMove);
+    //canvas.addEventListener('mouseup', onMouseUp);
+    canvas.addEventListener('keydown', onKeyDown);
+    canvas.addEventListener('keyup', onKeyUp);
+
+    // Capture the first xy coordinates
+    start = mousePos(e);
+    start_ll = e.lngLat;
+    console.log(start);
+    down = true;
+    }
+  });
+
+  mapbox.on('mousemove', function(e) {
+    if (down == false) return;
+    // Capture the ongoing xy coordinates
+    current = mousePos(e);
+    current_ll = e.lngLat;
+    console.log(current);
+    // Append the box element if it doesnt exist
+    if (!box) {
+        box = document.createElement('div');
+        box.classList.add('boxdraw');
+        canvas.appendChild(box);
+    }
+
+    var minX = Math.min(start.x, current.x),
+        maxX = Math.max(start.x, current.x),
+        minY = Math.min(start.y, current.y),
+        maxY = Math.max(start.y, current.y);
+
+    // Adjust width and xy position of the box element ongoing
+    var pos = 'translate(' + minX + 'px,' + minY + 'px)';
+    box.style.transform = pos;
+    box.style.WebkitTransform = pos;
+    box.style.width = maxX - minX + 'px';
+    box.style.height = maxY - minY + 'px';
+    
+    //finish([start, mousePos(e)]);
+  });
+
+  mapbox.on('mouseup', function(e) {
+    if (down) {
+      // Capture xy coordinates
+      //finish([start, mousePos(e)]);
+      
+      //canvas.removeEventListener('mousemove', onMouseMove);
+      canvas.removeEventListener('keydown', onKeyDown);
+      //canvas.removeEventListener('mouseup', onMouseUp);
+
+      if (box) {
+        // get highlighted 
+        var minLng = Math.min(start_ll.lng, current_ll.lng),
+        maxLng = Math.max(start_ll.lng, current_ll.lng),
+        minLat = Math.min(start_ll.lat, current_ll.lat),
+        maxLat = Math.max(start_ll.lat, current_ll.lat);
+       
+        var highlightedId = [];
+        var cents = centroids[selectedDataset];
+        for (var i=0; i < cents.length; ++i) {
+          var lng = cents[i][0], lat = cents[i][1];
+          if (lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng) {
+            highlightedId.push(i);
+          }
+        }
+        highlightSelected(highlightedId);
+        window.localStorage.setItem("HL_IDS", JSON.stringify(highlightedId));
+
+          box.parentNode.removeChild(box);
+          box = null;
+      }
+      down = false;
+      mapbox.dragPan.enable();
+    }
+  });
+
+  function onKeyDown(e) {
+    // If the ESC key is pressed
+    if (e.keyCode === 27) finish();
+  }
+
+  function onKeyUp(e) {
+    if (e.keyCode === 27) {
+      //map.setPaintProperty("counties", 'fill-color', 'rgba(0,0,0,0.5)');
+      return window.alert('S');
+    }
+  }
+});
 
 function createGeocoderData() {
   var result = {
@@ -1557,7 +1700,7 @@ function getCountyLayer(data)
       id: 'county_layer',
       type: GeoJsonLayer,
       data: data,
-      opacity: 0.6,
+      opacity: is_highlight ? 0.2 : 0.6,
       stroked: true,
       filled: true,
       lineWidthScale: 1,

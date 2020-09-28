@@ -580,3 +580,13 @@ data panel
 .mapboxgl-ctrl-top-right {
   z-index: 1000 !important;
 }
+
+.boxdraw {
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid white;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+}
