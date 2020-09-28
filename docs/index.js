@@ -206,8 +206,7 @@ function isLisa() {
 }
 
 function isCartogram() {
-  return false;
-//  return document.getElementById('cartogram-ckb').checked;
+  return document.getElementById('cartogram-ckb').checked;
 }
 
 function getCurrentWuuid() {
@@ -752,6 +751,9 @@ function init_state() {
   var nb;
 
   vals = GetDataValues(latestDate);
+  if (isCartogram()) {
+    vals = GetDataValues(selectedDate);
+  }
 
   var num_cat = 6;
   if (selectedMethod == "natural_breaks") num_cat = 8;
@@ -1451,6 +1453,8 @@ mapbox.on('load', function () {
   // Variable for the draw box element.
   var box;
 
+  var is_moving_box = false;
+
   console.log("load map");
 
   // Set `true` to dispatch the event before other functions
@@ -1472,52 +1476,108 @@ mapbox.on('load', function () {
     // Continue the rest of the function if the shiftkey is pressed.
     if (e.originalEvent.shiftKey && e.originalEvent.button === 0) {
 
-    e.preventDefault();
+      e.preventDefault();
 
-    // Disable default drag zooming when the shift key is held down.
-    mapbox.dragPan.disable();
+      // Disable default drag zooming when the shift key is held down.
+      mapbox.dragPan.disable();
 
-    //map.setPaintProperty("counties", 'fill-color', 'rgba(0,0,0,0.1)');
-    
-    // Call functions for the following events
-    //canvas.addEventListener('mousemove', onMouseMove);
-    //canvas.addEventListener('mouseup', onMouseUp);
-    canvas.addEventListener('keydown', onKeyDown);
-    canvas.addEventListener('keyup', onKeyUp);
+      //map.setPaintProperty("counties", 'fill-color', 'rgba(0,0,0,0.1)');
+      
+      // Call functions for the following events
+      //canvas.addEventListener('mousemove', onMouseMove);
+      //canvas.addEventListener('mouseup', onMouseUp);
+      canvas.addEventListener('keydown', onKeyDown);
+      canvas.addEventListener('keyup', onKeyUp);
 
-    // Capture the first xy coordinates
-    start = mousePos(e);
-    start_ll = e.lngLat;
-    console.log(start);
-    down = true;
+      // Capture the first xy coordinates
+      start = mousePos(e);
+      start_ll = e.lngLat;
+      console.log(start);
+      down = true;
+
+      if (box) {
+        if (start.x >= box.minX && start.x <= box.maxX && start.y >= box.minY && start.y <= box.maxY) {
+          is_moving_box = true;
+        } else {
+          // 
+          box.parentNode.removeChild(box);
+          box = null;
+          highlightSelected([]);
+          window.localStorage.setItem("HL_IDS", JSON.stringify([]));
+          is_moving_box = false;
+        }
+      }
     }
   });
 
   mapbox.on('mousemove', function(e) {
     if (down == false) return;
+
     // Capture the ongoing xy coordinates
     current = mousePos(e);
     current_ll = e.lngLat;
-    console.log(current);
-    // Append the box element if it doesnt exist
-    if (!box) {
-        box = document.createElement('div');
-        box.classList.add('boxdraw');
-        canvas.appendChild(box);
+    //console.log(current);
+
+    if (is_moving_box) {
+      var offset_x = current.x - start.x,
+          offset_y = current.y - start.y;
+
+      box.minX += offset_x;
+      box.minY += offset_y;
+      box.maxX += offset_x;
+      box.maxY += offset_y;
+
+      var offset_lng = current_ll.lng - start_ll.lng,
+          offset_lat = current_ll.lat - start_ll.lat;
+
+      box.minLng += offset_lng;
+      box.maxLng += offset_lng;
+      box.minLat += offset_lat;
+      box.maxLat += offset_lat;
+
+      var pos = 'translate(' + box.minX + 'px,' + box.minY + 'px)';
+      box.style.transform = pos;
+      box.style.WebkitTransform = pos;
+
+      start = current;
+      start_ll = current_ll;
+
+      drawHighlight({"lng": box.minLng, "lat": box.minLat}, {"lng": box.maxLng, "lat": box.maxLat});
+
+    } else {
+      // Append the box element if it doesnt exist
+      if (!box) {
+          box = document.createElement('div');
+          box.classList.add('boxdraw');
+          canvas.appendChild(box);
+      }
+
+      var minX = Math.min(start.x, current.x),
+          maxX = Math.max(start.x, current.x),
+          minY = Math.min(start.y, current.y),
+          maxY = Math.max(start.y, current.y);
+
+      // Adjust width and xy position of the box element ongoing
+      var pos = 'translate(' + minX + 'px,' + minY + 'px)';
+      box.style.transform = pos;
+      box.style.WebkitTransform = pos;
+      box.style.width = maxX - minX + 'px';
+      box.style.height = maxY - minY + 'px';
+      box.minX = minX;
+      box.minY = minY;
+      box.maxX = maxX;
+      box.maxY = maxY;
+
+      var minLng = Math.min(start_ll.lng, current_ll.lng),
+        maxLng = Math.max(start_ll.lng, current_ll.lng),
+        minLat = Math.min(start_ll.lat, current_ll.lat),
+        maxLat = Math.max(start_ll.lat, current_ll.lat);
+
+      box.minLng = minLng;
+      box.maxLng = maxLng;
+      box.minLat = minLat;
+      box.maxLat = maxLat;
     }
-
-    var minX = Math.min(start.x, current.x),
-        maxX = Math.max(start.x, current.x),
-        minY = Math.min(start.y, current.y),
-        maxY = Math.max(start.y, current.y);
-
-    // Adjust width and xy position of the box element ongoing
-    var pos = 'translate(' + minX + 'px,' + minY + 'px)';
-    box.style.transform = pos;
-    box.style.WebkitTransform = pos;
-    box.style.width = maxX - minX + 'px';
-    box.style.height = maxY - minY + 'px';
-    
     //finish([start, mousePos(e)]);
   });
 
@@ -1532,7 +1592,18 @@ mapbox.on('load', function () {
 
       if (box) {
         // get highlighted 
-        var minLng = Math.min(start_ll.lng, current_ll.lng),
+        drawHighlight(start_ll, current_ll);
+        //box.parentNode.removeChild(box);
+        //box = null;
+      }
+      down = false;
+      is_moving_box = false;
+      mapbox.dragPan.enable();
+    }
+  });
+
+  function drawHighlight(start_ll, current_ll) {
+    var minLng = Math.min(start_ll.lng, current_ll.lng),
         maxLng = Math.max(start_ll.lng, current_ll.lng),
         minLat = Math.min(start_ll.lat, current_ll.lat),
         maxLat = Math.max(start_ll.lat, current_ll.lat);
@@ -1547,14 +1618,7 @@ mapbox.on('load', function () {
         }
         highlightSelected(highlightedId);
         window.localStorage.setItem("HL_IDS", JSON.stringify(highlightedId));
-
-          box.parentNode.removeChild(box);
-          box = null;
-      }
-      down = false;
-      mapbox.dragPan.enable();
-    }
-  });
+  }
 
   function onKeyDown(e) {
     // If the ESC key is pressed
@@ -1562,9 +1626,14 @@ mapbox.on('load', function () {
   }
 
   function onKeyUp(e) {
-    if (e.keyCode === 27) {
+    if (e.keyCode === 16) {
       //map.setPaintProperty("counties", 'fill-color', 'rgba(0,0,0,0.5)');
-      return window.alert('S');
+      //return window.alert('S');
+      box.parentNode.removeChild(box);
+          box = null;
+          highlightSelected([]);
+          window.localStorage.setItem("HL_IDS", JSON.stringify([]));
+          is_moving_box = false;
     }
   }
 });
@@ -1653,7 +1722,7 @@ function getCartogramLayer(data)
 function getCartoLabelLayer(data)
 {
     var labels = [];
-    if ('name' in data && data.name.startsWith("state")) {
+    if (selectedDataset.startsWith("state")) {
       for (let i = 0; i < data.features.length; ++i) {
         labels.push({
           id: i,
